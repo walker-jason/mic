@@ -82,17 +82,138 @@ let actx=null,lastBeep=0,need=70,listening=false,rec=null,session=0,counted={},a
 state='idle',preStart=0,alarmStart=0,cooldown=0,warned=0;
 function keyword(){kw2=kw1;kw1=Date.now();log('[keyword] heard');}
 function startRec(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const cfg=CFG[$('lang').value];rec=new SR();rec.lang=$('lang').value;rec.continuous=true;rec.interimResults=true;session++;
-  rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){
-    const t=e.results[i][0].transcript.toLowerCase();$('tr').textContent=t;
-    const key=session+'-'+i,n=cfg.w.reduce((a,w)=>a+(t.match(new RegExp(w,'g'))||[]).length,0),prev=counted[key]||0;
-    for(let k=prev;k<n;k++)keyword();counted[key]=Math.max(prev,n);
-    if(state==='pre'&&cfg.c.some(c=>t.includes(c))){state='idle';cooldown=Date.now()+30000;log('Cancelled by voice - false alarm. Paused 30 s.');}
-  }};
-  rec.onend=()=>{if(listening)setTimeout(startRec,200)};
-  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){listening=false;log('Microphone or speech service blocked. Allow the mic and open this file in Chrome/Edge.');ui('Not listening','Blocked.')}};
-  rec.start();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SR){
+    log('[speech] SpeechRecognition NOT supported');
+    ui('Speech unavailable','This browser does not support speech recognition.');
+    return;
+  }
+
+  const cfg = CFG[$('lang').value];
+
+  rec = new SR();
+
+  rec.lang = $('lang').value;
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 3;
+
+  session++;
+
+  rec.onstart = () => {
+    log('[speech] Recognition started');
+    ui('Listening','Speak now...');
+  };
+
+  rec.onspeechstart = () => {
+    log('[speech] Speech detected');
+  };
+
+  rec.onspeechend = () => {
+    log('[speech] Speech ended');
+  };
+
+  rec.onresult = e => {
+
+    for(let i = e.resultIndex; i < e.results.length; i++){
+
+      const result = e.results[i];
+      const t = result[0].transcript.trim().toLowerCase();
+
+      if(!t) continue;
+
+      $('tr').textContent = t;
+
+      log('[speech] "' + t + '"');
+
+      const key = session + '-' + i;
+
+      const n = cfg.w.reduce(
+        (a,w) => a + (t.match(new RegExp(w,'gi')) || []).length,
+        0
+      );
+
+      const prev = counted[key] || 0;
+
+      for(let k = prev; k < n; k++){
+        keyword();
+      }
+
+      counted[key] = Math.max(prev,n);
+
+      if(
+        state === 'pre' &&
+        cfg.c.some(c => t.includes(c))
+      ){
+        state = 'idle';
+        cooldown = Date.now() + 30000;
+
+        log('Cancelled by voice - false alarm. Paused 30 s.');
+      }
+    }
+  };
+
+  rec.onerror = e => {
+    log('[speech error] ' + e.error);
+
+    if(e.error === 'not-allowed' ||
+       e.error === 'service-not-allowed'){
+
+      listening = false;
+
+      ui(
+        'Speech blocked',
+        'Allow microphone and speech recognition.'
+      );
+
+    } else if(e.error === 'network') {
+
+      log('[speech] Network error - speech service unavailable');
+
+    } else if(e.error === 'no-speech') {
+
+      log('[speech] No speech detected');
+
+    } else {
+
+      log('[speech] Error: ' + e.error);
+    }
+  };
+
+  rec.onnomatch = () => {
+    log('[speech] Speech heard but no matching transcription');
+  };
+
+  rec.onend = () => {
+
+    log('[speech] Recognition ended');
+
+    if(listening){
+
+      setTimeout(() => {
+
+        try {
+          rec.start();
+          log('[speech] Restarting recognition');
+
+        } catch(e) {
+          log('[speech] Restart failed: ' + e.message);
+        }
+
+      },500);
+    }
+  };
+
+  try {
+
+    rec.start();
+    log('[speech] Starting recognition...');
+
+  } catch(e) {
+
+    log('[speech] Start error: ' + e.message);
+  }
 }
 async function start(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
