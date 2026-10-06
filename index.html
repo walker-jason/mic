@@ -114,45 +114,58 @@ function startRec(){
     log('[speech] Speech ended');
   };
 
-  rec.onresult = e => {
+rec.onresult = e => {
+  for (let i = e.resultIndex; i < e.results.length; i++) {
 
-    for(let i = e.resultIndex; i < e.results.length; i++){
+    const result = e.results[i];
+    const transcript = result[0].transcript.trim();
 
-      const result = e.results[i];
-      const t = result[0].transcript.trim().toLowerCase();
+    if (!transcript) continue;
 
-      if(!t) continue;
+    // Show the latest recognized speech
+    $('tr').textContent = transcript;
 
-      $('tr').textContent = t;
+    // Add everything recognized to the Device Log
+    log('[RECOGNIZED] ' + transcript);
 
-      log('[speech] "' + t + '"');
-
-      const key = session + '-' + i;
-
-      const n = cfg.w.reduce(
-        (a,w) => a + (t.match(new RegExp(w,'gi')) || []).length,
-        0
-      );
-
-      const prev = counted[key] || 0;
-
-      for(let k = prev; k < n; k++){
-        keyword();
-      }
-
-      counted[key] = Math.max(prev,n);
-
-      if(
-        state === 'pre' &&
-        cfg.c.some(c => t.includes(c))
-      ){
-        state = 'idle';
-        cooldown = Date.now() + 30000;
-
-        log('Cancelled by voice - false alarm. Paused 30 s.');
-      }
+    // Optional: show whether Chrome considers it final
+    if (result.isFinal) {
+      log('[FINAL] ' + transcript);
+    } else {
+      log('[INTERIM] ' + transcript);
     }
-  };
+
+    // Your existing keyword detection
+    const t = transcript.toLowerCase();
+    const cfg = CFG[$('lang').value];
+
+    const key = session + '-' + i;
+
+    const n = cfg.w.reduce(
+      (a, w) => a + (t.match(new RegExp(w, 'gi')) || []).length,
+      0
+    );
+
+    const prev = counted[key] || 0;
+
+    for (let k = prev; k < n; k++) {
+      keyword();
+    }
+
+    counted[key] = Math.max(prev, n);
+
+    // Cancel command
+    if (
+      state === 'pre' &&
+      cfg.c.some(c => t.includes(c))
+    ) {
+      state = 'idle';
+      cooldown = Date.now() + 30000;
+
+      log('Cancelled by voice - false alarm. Paused 30 s.');
+    }
+  }
+};
 
   rec.onerror = e => {
     log('[speech error] ' + e.error);
