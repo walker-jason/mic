@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room 108 voice guard</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14202b;--mute:#5b6b7a;--line:#d4dbe2;--ok:#2e9e6b;--warn:#e0a100;--bad:#d62828}
+@media (prefers-color-scheme:dark){:root{--bg:#0f161d;--panel:#18222c;--ink:#e6edf3;--mute:#93a3b2;--line:#2a3846}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 32px;display:grid;gap:16px}
+h1{font-size:1.35rem;margin:0}.sub{margin:2px 0 0;color:var(--mute);font-size:.92rem}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button,select{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button#start{background:#1d6fd6;color:#fff;border-color:#1d6fd6;cursor:pointer}
+button:focus-visible,select:focus-visible{outline:3px solid #f1c40f}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{font-size:1rem;margin:0 0 10px}
+.status{display:flex;gap:16px;align-items:center}
+.led{flex:none;width:54px;height:54px;border-radius:50%;background:#4a2424;border:3px solid var(--line)}
+.led.on{background:#ff2a2a;box-shadow:0 0 26px 8px rgba(255,42,42,.7)}
+#st{font-size:1.25rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.meter{position:relative;height:22px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;width:0;background:var(--ok)}.meter i.over{background:var(--bad)}
+.tr{margin-top:10px;min-height:48px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--mute)}
+.chips{display:grid;gap:8px}
+.chip{display:flex;justify-content:space-between;padding:8px 12px;border:1px solid var(--line);border-radius:8px;color:var(--mute)}
+.chip.on{border-color:var(--ok);color:var(--ink);background:rgba(46,158,107,.12)}
+.term{background:#0e1a16;color:#9df5c4;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;border-radius:8px;padding:12px;height:230px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Room 108 voice guard</h1>
+    <p class="sub">Hands-free test on your phone or computer. Say "help" out loud. Use Chrome (Android) or Edge, allow the microphone, and stay online: speech recognition runs on the browser's cloud service.</p>
+  </header>
+  <div class="bar">
+    <button id="start">Start listening</button>
+    <select id="lang" aria-label="Language">
+      <option value="en-US">English: "help"</option>
+      <option value="de-DE">Deutsch: "Hilfe", "Notfall"</option>
+      <option value="fr-FR">Français : "urgence", "au secours"</option>
+      <option value="ar-SA">العربية: "نجدة"</option>
+    </select>
+    <select id="mode" aria-label="Sensitivity">
+      <option value="70">Balanced: help + raised voice, or said twice</option>
+      <option value="40">Sensitive: any "help" triggers</option>
+    </select>
+  </div>
+  <section class="card status" aria-live="polite">
+    <div class="led" id="led"></div>
+    <div><b id="st">Not listening</b><div class="sub" id="sub">Press Start listening once; after that everything is by voice.</div></div>
+  </section>
+  <div class="grid">
+    <section class="card">
+      <h2>Microphone</h2>
+      <div class="meter"><i id="lvl"></i></div>
+      <div class="tr" id="tr">What you say appears here.</div>
+    </section>
+    <section class="card">
+      <h2>Evidence (the keyword is always required)</h2>
+      <div class="chips">
+        <div class="chip" id="c1"><span>Keyword heard (last 3 s)</span><b>40</b></div>
+        <div class="chip" id="c2"><span>Loud voice, sustained (last 3 s)</span><b>30</b></div>
+        <div class="chip" id="c3"><span>Keyword said twice within 6 s</span><b>30</b></div>
+      </div>
+    </section>
+  </div>
+  <section class="card"><h2>Device log</h2><div class="term" id="term"></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const CFG={'en-US':{w:['\\bhelp\\b','\\bemergenc'],c:['cancel','false alarm','i am okay',"i'm okay"]},
+ 'de-DE':{w:['\\bhilfe\\b','notfall'],c:['abbrechen','falscher alarm','alles okay']},
+ 'fr-FR':{w:['urgence','au secours'],c:['annul','fausse alerte']},
+ 'ar-SA':{w:['نجدة','النجدة'],c:['إلغاء','الغاء']}};
+const log=s=>{$('term').textContent+=s+'\n';$('term').scrollTop=1e9};
+let actx=null,lastBeep=0,need=70,listening=false,rec=null,session=0,counted={},analyser,buf,amb=8,loudMs=0,lastLoud=0,kw1=0,kw2=0,
+state='idle',preStart=0,alarmStart=0,cooldown=0,warned=0;
+function keyword(){kw2=kw1;kw1=Date.now();log('[keyword] heard');}
+function startRec(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const cfg=CFG[$('lang').value];rec=new SR();rec.lang=$('lang').value;rec.continuous=true;rec.interimResults=true;session++;
+  rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){
+    const t=e.results[i][0].transcript.toLowerCase();$('tr').textContent=t;
+    const key=session+'-'+i,n=cfg.w.reduce((a,w)=>a+(t.match(new RegExp(w,'g'))||[]).length,0),prev=counted[key]||0;
+    for(let k=prev;k<n;k++)keyword();counted[key]=Math.max(prev,n);
+    if(state==='pre'&&cfg.c.some(c=>t.includes(c))){state='idle';cooldown=Date.now()+30000;log('Cancelled by voice - false alarm. Paused 30 s.');}
+  }};
+  rec.onend=()=>{if(listening)setTimeout(startRec,200)};
+  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){listening=false;log('Microphone or speech service blocked. Allow the mic and open this file in Chrome/Edge.');ui('Not listening','Blocked.')}};
+  rec.start();
+}
+async function start(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){log('This browser has no speech recognition. Use Chrome or Edge.');return}
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:true});
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    actx=ctx;analyser=ctx.createAnalyser();analyser.fftSize=1024;buf=new Uint8Array(analyser.fftSize);
+    ctx.createMediaStreamSource(st).connect(analyser);
+  }catch(e){log('Microphone unavailable: '+e.name);return}
+  listening=true;$('start').disabled=true;$('start').textContent='Listening...';
+  log('=== HOTEL ROOM SAFETY DEVICE - Room 108 ===\nListening. Say the keyword.');
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
+  startRec();setInterval(tick,50);ui('Listening','Say the keyword out loud.');
+}
+function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+function beep(f,ms){if(!actx)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.value=.2;o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+ms/1000)}
+function ui(a,b){$('st').textContent=a;$('sub').textContent=b}
+function tick(){
+  const now=Date.now();analyser.getByteTimeDomainData(buf);let s=0;for(const v of buf){const x=(v-128)/128;s+=x*x}
+  const level=Math.min(100,Math.sqrt(s/buf.length)*300);
+  const isLoud=level>=Math.max(35,amb*2.5);
+  if(!isLoud)amb=amb*0.995+level*0.005;
+  $('lvl').style.width=level+'%';$('lvl').classList.toggle('over',isLoud);
+  if(isLoud){loudMs+=50;if(loudMs>=300)lastLoud=now}else loudMs=0;
+  const kwR=kw1&&now-kw1<=3000,loudR=lastLoud&&now-lastLoud<=3000,twice=kwR&&kw2&&kw1-kw2<=6000;
+  const score=(kwR?40:0)+(loudR?30:0)+(twice?30:0);
+  $('c1').classList.toggle('on',!!kwR);$('c2').classList.toggle('on',!!loudR);$('c3').classList.toggle('on',!!twice);
+  const led=$('led');
+  if(state==='idle'){
+    led.classList.remove('on');
+    if(kwR&&score>=need&&now>=cooldown){state='pre';preStart=now;kw1=kw2=0;
+      log('\nPossible emergency (score '+score+'/100). Say "cancel" within 5 s to stop it.');buzz([200,100,200,100,200]);}
+    else if(kwR&&score<need&&warned!==kw1){warned=kw1;log('Keyword only (score '+score+'/100) - ignored. Needs a loud voice or a second keyword.')}
+  }else if(state==='pre'){
+    led.classList.toggle('on',Math.floor(now/150)%2===0);
+    if(Math.floor(now/500)!==lastBeep){lastBeep=Math.floor(now/500);beep(660,120)}
+    ui('Possible emergency','Say "cancel" to stop. SOS in '+Math.max(0,Math.ceil((5000-(now-preStart))/1000))+' s.');
+    if(now-preStart>=5000){state='alarm';alarmStart=now;
+      buzz([800,200,800,200,800]);beep(880,900);
+      log('\n================================\nSOS SENT - keyword + evidence, not cancelled\nROOM: 108\n(skipped: no server in this test)\n================================');}
+  }else if(state==='alarm'){
+    led.classList.add('on');ui('SOS sent to the hotel manager','Room 108 (demo: clears after 10 s).');
+    if(now-alarmStart>=10000){state='idle';cooldown=now+30000;log('SOS reset (demo auto-clear).')}
+  }
+  if(state==='idle')ui('Listening','Say the keyword out loud.');
+}
+$('mode').onchange=()=>{need=+$('mode').value;log('Sensitivity: '+(need===40?'any "help" triggers':'balanced'))};
+$('start').onclick=start;
+$('lang').onchange=()=>{if(listening&&rec){rec.onend=null;rec.abort();startRec();rec.onend=()=>{if(listening)setTimeout(startRec,200)}}};
+</script>
+</body>
+</html>
