@@ -5,253 +5,285 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Room 108 voice guard</title>
 <style>
-:root{--bg:#eef1f4;--panel:#fff;--ink:#14202b;--mute:#5b6b7a;--line:#d4dbe2;--ok:#2e9e6b;--warn:#e0a100;--bad:#d62828}
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14202b;--mute:#5b6b7a;--line:#d4dbe2;--ok:#2e9e6b;--warn:#e0a100;--bad:#d62828;--acc:#1d6fd6}
 @media (prefers-color-scheme:dark){:root{--bg:#0f161d;--panel:#18222c;--ink:#e6edf3;--mute:#93a3b2;--line:#2a3846}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:860px;margin:0 auto;padding:20px 16px 32px;display:grid;gap:16px}
+main{max-width:920px;margin:0 auto;padding:20px 16px 32px;display:grid;gap:16px}
 h1{font-size:1.35rem;margin:0}.sub{margin:2px 0 0;color:var(--mute);font-size:.92rem}
 .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-button,select{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
-button#start{background:#1d6fd6;color:#fff;border-color:#1d6fd6;cursor:pointer}
-button:focus-visible,select:focus-visible{outline:3px solid #f1c40f}
+button,select,input[type=text]{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button{cursor:pointer}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.stop{background:var(--bad);color:#fff;border-color:var(--bad)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #f1c40f}
+label.chk{display:flex;gap:6px;align-items:center;font-size:.92rem;color:var(--mute)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
 .card h2{font-size:1rem;margin:0 0 10px}
 .status{display:flex;gap:16px;align-items:center}
 .led{flex:none;width:54px;height:54px;border-radius:50%;background:#4a2424;border:3px solid var(--line)}
 .led.on{background:#ff2a2a;box-shadow:0 0 26px 8px rgba(255,42,42,.7)}
+.led.hear{border-color:var(--ok)}
 #st{font-size:1.25rem}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:700px){.grid{grid-template-columns:1fr}}
 .meter{position:relative;height:22px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .meter i{position:absolute;inset:0 auto 0 0;width:0;background:var(--ok)}.meter i.over{background:var(--bad)}
-.tr{margin-top:10px;min-height:48px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--mute)}
+.live{min-height:84px;padding:12px;border:2px solid var(--line);border-radius:10px;font-size:1.3rem;line-height:1.4;overflow-wrap:anywhere}
+.live.on{border-color:var(--ok)}
+.live .ph{color:var(--mute);font-size:1rem}
+.live .interim{color:var(--mute)}
+mark{background:#ffd54a;color:#14202b;border-radius:4px;padding:0 3px;font-weight:700}
+.hist{margin-top:10px;max-height:180px;overflow:auto;display:grid;gap:4px;font-size:.95rem}
+.hist div{padding:4px 8px;border-left:3px solid var(--line);color:var(--mute)}
+.hist div.hit{border-left-color:var(--bad);color:var(--ink)}
 .chips{display:grid;gap:8px}
 .chip{display:flex;justify-content:space-between;padding:8px 12px;border:1px solid var(--line);border-radius:8px;color:var(--mute)}
 .chip.on{border-color:var(--ok);color:var(--ink);background:rgba(46,158,107,.12)}
+.words{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.w{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
+.w button{padding:0 8px;border:0;background:none;color:var(--bad);font-size:1.15rem;line-height:1.4}
+.add{display:flex;gap:8px;flex-wrap:wrap}.add input{flex:1;min-width:180px}
 .term{background:#0e1a16;color:#9df5c4;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;border-radius:8px;padding:12px;height:230px;overflow:auto;white-space:pre-wrap}
+.warnbox{display:none;border-color:var(--warn);background:rgba(224,161,0,.12)}
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Room 108 voice guard</h1>
-    <p class="sub">Hands-free test on your phone or computer. Say "help" out loud. Use Chrome (Android) or Edge, allow the microphone, and stay online: speech recognition runs on the browser's cloud service.</p>
+    <p class="sub">Hands-free test. Press Start, allow the microphone, and say a trigger word. Use Chrome or Edge and stay online: speech recognition runs on the browser's cloud service.</p>
   </header>
+
+  <section class="card warnbox" id="warn"></section>
+
   <div class="bar">
-    <button id="start">Start listening</button>
+    <button id="start" class="pri">Start listening</button>
     <select id="lang" aria-label="Language">
-      <option value="en-US">English: "help"</option>
-      <option value="de-DE">Deutsch: "Hilfe", "Notfall"</option>
-      <option value="fr-FR">Français : "urgence", "au secours"</option>
-      <option value="ar-SA">العربية: "نجدة"</option>
+      <option value="en-US">English</option>
+      <option value="de-DE">Deutsch</option>
+      <option value="fr-FR">Français</option>
+      <option value="ar-SA">العربية</option>
     </select>
     <select id="mode" aria-label="Sensitivity">
-      <option value="70">Balanced: help + raised voice, or said twice</option>
-      <option value="40">Sensitive: any "help" triggers</option>
+      <option value="70">Balanced: keyword + raised voice, or said twice</option>
+      <option value="40">Sensitive: any trigger word</option>
     </select>
+    <label class="chk"><input type="checkbox" id="meter"> Volume meter (turn off if speech isn't recognized on Android)</label>
   </div>
+
   <section class="card status" aria-live="polite">
     <div class="led" id="led"></div>
     <div><b id="st">Not listening</b><div class="sub" id="sub">Press Start listening once; after that everything is by voice.</div></div>
   </section>
+
+  <section class="card">
+    <h2>What I hear</h2>
+    <div class="live" id="live"><span class="ph">Your words appear here while you speak.</span></div>
+    <div class="hist" id="hist"></div>
+  </section>
+
   <div class="grid">
     <section class="card">
-      <h2>Microphone</h2>
-      <div class="meter"><i id="lvl"></i></div>
-      <div class="tr" id="tr">What you say appears here.</div>
+      <h2>Trigger words (<span id="wl">English</span>)</h2>
+      <div class="add">
+        <input type="text" id="newword" placeholder="Type a word or phrase, then press Enter" autocomplete="off">
+        <button id="addbtn">Add</button>
+      </div>
+      <div class="words" id="words"></div>
+      <div class="bar" style="margin-top:12px">
+        <button id="reset">Restore default words</button>
+        <button id="sim">Simulate keyword</button>
+      </div>
+      <p class="sub">Words are saved in this browser, one list per language. Phrases like "call the police" work too.</p>
     </section>
     <section class="card">
-      <h2>Evidence (the keyword is always required)</h2>
-      <div class="chips">
-        <div class="chip" id="c1"><span>Keyword heard (last 3 s)</span><b>40</b></div>
+      <h2>Microphone and evidence</h2>
+      <div class="meter"><i id="lvl"></i></div>
+      <div class="chips" style="margin-top:12px">
+        <div class="chip" id="c1"><span>Trigger word heard (last 3 s)</span><b>40</b></div>
         <div class="chip" id="c2"><span>Loud voice, sustained (last 3 s)</span><b>30</b></div>
-        <div class="chip" id="c3"><span>Keyword said twice within 6 s</span><b>30</b></div>
+        <div class="chip" id="c3"><span>Trigger word said twice within 6 s</span><b>30</b></div>
       </div>
+      <p class="sub">A trigger word is always required. Say "cancel" within 5 s of a pre-alert to stop it.</p>
     </section>
   </div>
-  <section class="card"><h2>Device log</h2><div class="term" id="term"></div></section>
+
+  <section class="card">
+    <h2>Device log</h2>
+    <div class="term" id="term"></div>
+    <div class="bar" style="margin-top:10px"><button id="clear">Clear log</button></div>
+  </section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const CFG={'en-US':{w:['\\bhelp\\b','\\bemergenc'],c:['cancel','false alarm','i am okay',"i'm okay"]},
- 'de-DE':{w:['\\bhilfe\\b','notfall'],c:['abbrechen','falscher alarm','alles okay']},
- 'fr-FR':{w:['urgence','au secours'],c:['annul','fausse alerte']},
- 'ar-SA':{w:['نجدة','النجدة'],c:['إلغاء','الغاء']}};
-const log=s=>{$('term').textContent+=s+'\n';$('term').scrollTop=1e9};
-let actx=null,lastBeep=0,need=70,listening=false,rec=null,session=0,counted={},analyser,buf,amb=8,loudMs=0,lastLoud=0,kw1=0,kw2=0,
-state='idle',preStart=0,alarmStart=0,cooldown=0,warned=0;
-function keyword(){kw2=kw1;kw1=Date.now();log('[keyword] heard');}
+const LS=(()=>{try{localStorage.setItem('t','1');localStorage.removeItem('t');return localStorage}catch(e){return{getItem(){return null},setItem(){}}}})();
+const LANGS={'en-US':'English','de-DE':'Deutsch','fr-FR':'Français','ar-SA':'العربية'};
+const DEF={'en-US':['help','emergency'],'de-DE':['hilfe','notfall'],'fr-FR':['urgence','au secours','à l\'aide'],'ar-SA':['نجدة','النجدة','ساعدوني']};
+const CAN={'en-US':['cancel','false alarm','i am okay',"i'm okay"],'de-DE':['abbrechen','falscher alarm','alles okay'],'fr-FR':['annul','fausse alerte'],'ar-SA':['إلغاء','الغاء']};
+
+/* ---------- helpers ---------- */
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f\u064B-\u065F]/g,'').replace(/[’']/g,"'");
+const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const B1='(^|[^\\p{L}\\p{N}])',B2='(?=$|[^\\p{L}\\p{N}])';
+function count(text,list){const t=norm(text);let n=0;
+  for(const w of list){const x=norm(w.trim());if(!x)continue;const m=t.match(new RegExp(B1+esc(x).replace(/\s+/g,'\\s+')+B2,'gu'));if(m)n+=m.length}
+  return n}
+function hasAny(text,list){const t=norm(text);return list.some(c=>t.includes(norm(c)))}
+function html(text,list){let h=text.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const ws=list.filter(w=>w.trim()).map(w=>esc(w.trim()).replace(/\s+/g,'\\s+'));
+  if(!ws.length)return h;
+  try{return h.replace(new RegExp('(?<![\\p{L}\\p{N}])('+ws.join('|')+')(?![\\p{L}\\p{N}])','giu'),'<mark>$1</mark>')}catch(e){return h}}
+const log=s=>{const t=$('term');t.textContent+=s+'\n';t.scrollTop=1e9};
+
+/* ---------- trigger words ---------- */
+let store=JSON.parse(LS.getItem('r108.words')||'{}');
+const lang=()=>$('lang').value;
+const words=()=>store[lang()]||(store[lang()]=DEF[lang()].slice());
+const saveWords=()=>LS.setItem('r108.words',JSON.stringify(store));
+function renderWords(){
+  $('wl').textContent=LANGS[lang()];
+  const box=$('words');box.textContent='';
+  words().forEach((w,i)=>{
+    const s=document.createElement('span');s.className='w';s.dir='auto';
+    s.append(w);
+    const b=document.createElement('button');b.textContent='×';b.setAttribute('aria-label','Remove '+w);
+    b.onclick=()=>{words().splice(i,1);saveWords();renderWords();log('Removed trigger word: '+w);restartRec()};
+    s.append(b);box.append(s)});
+  if(!words().length){const p=document.createElement('span');p.className='sub';p.textContent='No trigger words: add at least one.';box.append(p)}
+}
+function addWord(){
+  const v=$('newword').value.trim();if(!v)return;
+  if(words().some(w=>norm(w)===norm(v))){log('Already in the list: '+v)}
+  else{words().push(v);saveWords();log('Added trigger word: '+v)}
+  $('newword').value='';renderWords();$('newword').focus();
+}
+$('addbtn').onclick=addWord;
+$('newword').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addWord()}};
+$('reset').onclick=()=>{store[lang()]=DEF[lang()].slice();saveWords();renderWords();log('Default words restored.')};
+
+/* ---------- state ---------- */
+let actx,analyser,buf,mstream,tickId,rec,session=0,listening=false,counted={},finalSeen={},restartT,fails=0,lastStart=0,
+need=70,amb=8,loudMs=0,lastLoud=0,kw1=0,kw2=0,state='idle',preStart=0,alarmStart=0,cooldown=0,warned=0,lastBeep=0;
+function keyword(w){kw2=kw1;kw1=Date.now();log('[trigger] heard'+(w?': '+w:''))}
+function ui(a,b){$('st').textContent=a;$('sub').textContent=b}
+
+/* ---------- live transcript ---------- */
+let histN=0;
+function showLive(final,interim){
+  const L=$('live');L.classList.add('on');
+  const list=words();
+  L.innerHTML=html(final,list)+(interim?'<span class="interim"> '+html(interim,list)+'</span>':'');
+  if(!final&&!interim)L.innerHTML='<span class="ph">Listening… say something.</span>';
+  L.dir='auto';
+}
+function addHist(text,hit){
+  const d=document.createElement('div');if(hit)d.className='hit';d.dir='auto';
+  d.innerHTML=html(text,words());
+  const h=$('hist');h.prepend(d);while(h.children.length>40)h.lastChild.remove();
+}
+
+/* ---------- speech recognition ---------- */
 function startRec(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if(!SR){
-    log('[speech] SpeechRecognition NOT supported');
-    ui('Speech unavailable','This browser does not support speech recognition.');
-    return;
-  }
-
-  const cfg = CFG[$('lang').value];
-
-  rec = new SR();
-
-  rec.lang = $('lang').value;
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.maxAlternatives = 3;
-
-  session++;
-
-  rec.onstart = () => {
-    log('[speech] Recognition started');
-    ui('Listening','Speak now...');
-  };
-
-  rec.onspeechstart = () => {
-    log('[speech] Speech detected');
-  };
-
-  rec.onspeechend = () => {
-    log('[speech] Speech ended');
-  };
-
-rec.onresult = e => {
-  for (let i = e.resultIndex; i < e.results.length; i++) {
-
-    const result = e.results[i];
-    const transcript = result[0].transcript.trim();
-
-    if (!transcript) continue;
-
-    // Show the latest recognized speech
-    $('tr').textContent = transcript;
-
-    // Add everything recognized to the Device Log
-    log('[RECOGNIZED] ' + transcript);
-
-    // Optional: show whether Chrome considers it final
-    if (result.isFinal) {
-      log('[FINAL] ' + transcript);
-    } else {
-      log('[INTERIM] ' + transcript);
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ui('Speech unavailable','This browser has no speech recognition. Use Chrome or Edge.');log('[speech] not supported');return}
+  const r=new SR();rec=r;session++;const sid=session;counted={};finalSeen={};
+  r.lang=lang();r.continuous=true;r.interimResults=true;r.maxAlternatives=3;
+  r.onstart=()=>{lastStart=Date.now();log('[speech] started ('+r.lang+')');showLive('','');ui('Listening','Say a trigger word out loud.')};
+  r.onaudiostart=()=>log('[speech] microphone audio is flowing');
+  r.onsoundstart=()=>$('led').classList.add('hear');
+  r.onsoundend=()=>$('led').classList.remove('hear');
+  r.onresult=e=>{
+    if(r!==rec)return;fails=0;
+    const cfg=words(),cancels=CAN[lang()];
+    let fin='',inter='';
+    for(let i=0;i<e.results.length;i++){
+      const res=e.results[i],txt=res[0].transcript;
+      if(res.isFinal)fin+=txt+' ';else inter+=txt+' ';
     }
-
-    // Your existing keyword detection
-    const t = transcript.toLowerCase();
-    const cfg = CFG[$('lang').value];
-
-    const key = session + '-' + i;
-
-    const n = cfg.w.reduce(
-      (a, w) => a + (t.match(new RegExp(w, 'gi')) || []).length,
-      0
-    );
-
-    const prev = counted[key] || 0;
-
-    for (let k = prev; k < n; k++) {
-      keyword();
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const res=e.results[i];let n=0,best=res[0].transcript,all=[];
+      for(let a=0;a<res.length;a++){const t=res[a].transcript;all.push(t);const c=count(t,cfg);if(c>n)n=c}
+      const key=sid+'-'+i,prev=counted[key]||0;
+      for(let k=prev;k<n;k++)keyword(best.trim());
+      counted[key]=Math.max(prev,n);
+      if(state==='pre'&&all.some(t=>hasAny(t,cancels))){
+        state='idle';cooldown=Date.now()+30000;log('Cancelled by voice - false alarm. Paused 30 s.');
+      }
+      if(res.isFinal&&!finalSeen[key]){finalSeen[key]=1;
+        log('[heard] '+best.trim());addHist(best.trim(),n>0);
+      }
     }
-
-    counted[key] = Math.max(prev, n);
-
-    // Cancel command
-    if (
-      state === 'pre' &&
-      cfg.c.some(c => t.includes(c))
-    ) {
-      state = 'idle';
-      cooldown = Date.now() + 30000;
-
-      log('Cancelled by voice - false alarm. Paused 30 s.');
-    }
-  }
-};
-
-  rec.onerror = e => {
-    log('[speech error] ' + e.error);
-
-    if(e.error === 'not-allowed' ||
-       e.error === 'service-not-allowed'){
-
-      listening = false;
-
-      ui(
-        'Speech blocked',
-        'Allow microphone and speech recognition.'
-      );
-
-    } else if(e.error === 'network') {
-
-      log('[speech] Network error - speech service unavailable');
-
-    } else if(e.error === 'no-speech') {
-
-      log('[speech] No speech detected');
-
-    } else {
-
-      log('[speech] Error: ' + e.error);
-    }
+    showLive(fin.trim(),inter.trim());
   };
-
-  rec.onnomatch = () => {
-    log('[speech] Speech heard but no matching transcription');
+  r.onerror=e=>{
+    const m={ 'not-allowed':'Microphone or speech permission blocked. Allow it in the address bar, and open the page over https:// or http://localhost (not file://).',
+      'service-not-allowed':'Speech service blocked by the browser.','audio-capture':'No microphone found, or another app is using it.',
+      'network':'No connection to the speech service. Check your internet.','language-not-supported':'This language is not supported by the browser.'};
+    log('[speech error] '+e.error+(m[e.error]?' - '+m[e.error]:''));
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){listening=false;stopAll();ui('Speech blocked',m[e.error]);showWarn(m[e.error])}
+    else if(e.error==='audio-capture'||e.error==='network')ui('Speech problem',m[e.error]);
   };
-
-  rec.onend = () => {
-
-    log('[speech] Recognition ended');
-
-    if(listening){
-
-      setTimeout(() => {
-
-        try {
-          rec.start();
-          log('[speech] Restarting recognition');
-
-        } catch(e) {
-          log('[speech] Restart failed: ' + e.message);
-        }
-
-      },500);
-    }
+  r.onend=()=>{
+    $('led').classList.remove('hear');
+    if(r!==rec)return;
+    log('[speech] ended');
+    if(!listening)return;
+    fails=(Date.now()-lastStart<1500)?fails+1:0;
+    const d=Math.min(5000,250*(1+fails*2));
+    clearTimeout(restartT);restartT=setTimeout(()=>{if(listening)startRec()},d);
   };
+  try{r.start()}catch(err){log('[speech] start error: '+err.message)}
+}
+function restartRec(){
+  if(!listening||!rec)return;
+  const old=rec;rec=null;try{old.abort()}catch(e){}
+  clearTimeout(restartT);restartT=setTimeout(()=>{if(listening)startRec()},300);
+}
+function showWarn(t){const w=$('warn');w.style.display='block';w.textContent=t}
 
-  try {
-
-    rec.start();
-    log('[speech] Starting recognition...');
-
-  } catch(e) {
-
-    log('[speech] Start error: ' + e.message);
-  }
+/* ---------- start / stop ---------- */
+function stopAll(){
+  listening=false;clearTimeout(restartT);
+  if(rec){const o=rec;rec=null;try{o.abort()}catch(e){}}
+  if(mstream){mstream.getTracks().forEach(t=>t.stop());mstream=null}
+  if(actx){try{actx.close()}catch(e){}actx=null}analyser=null;
+  clearInterval(tickId);tickId=0;state='idle';
+  $('start').textContent='Start listening';$('start').className='pri';$('led').classList.remove('on');
+  $('lvl').style.width='0';
 }
 async function start(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){log('This browser has no speech recognition. Use Chrome or Edge.');return}
+  if(listening){stopAll();ui('Not listening','Press Start listening to resume.');log('Stopped.');return}
+  if(!(window.SpeechRecognition||window.webkitSpeechRecognition)){showWarn('This browser has no speech recognition. Use Chrome or Edge.');log('No speech recognition in this browser.');return}
   try{
-    const st=await navigator.mediaDevices.getUserMedia({audio:true});
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    actx=ctx;analyser=ctx.createAnalyser();analyser.fftSize=1024;buf=new Uint8Array(analyser.fftSize);
-    ctx.createMediaStreamSource(st).connect(analyser);
-  }catch(e){log('Microphone unavailable: '+e.name);return}
-  listening=true;$('start').disabled=true;$('start').textContent='Listening...';
-  log('=== HOTEL ROOM SAFETY DEVICE - Room 108 ===\nListening. Say the keyword.');
+    mstream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    if($('meter').checked){
+      actx=new (window.AudioContext||window.webkitAudioContext)();
+      analyser=actx.createAnalyser();analyser.fftSize=1024;buf=new Uint8Array(analyser.fftSize);
+      actx.createMediaStreamSource(mstream).connect(analyser);
+    }else{ // release the mic so speech recognition can use it exclusively (Android)
+      mstream.getTracks().forEach(t=>t.stop());mstream=null;
+    }
+  }catch(e){log('Microphone unavailable: '+e.name);showWarn('Microphone unavailable ('+e.name+'). Allow microphone access, and open the page over https:// or http://localhost.');return}
+  listening=true;need=+$('mode').value;
+  $('start').textContent='Stop listening';$('start').className='stop';
+  log('=== HOTEL ROOM SAFETY DEVICE - Room 108 ===\nListening. Trigger words: '+words().join(', '));
   try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
-  startRec();setInterval(tick,50);ui('Listening','Say the keyword out loud.');
+  startRec();tickId=setInterval(tick,50);ui('Listening','Say a trigger word out loud.');
 }
+
+/* ---------- alerts ---------- */
 function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 function beep(f,ms){if(!actx)return;const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;g.gain.value=.2;o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+ms/1000)}
-function ui(a,b){$('st').textContent=a;$('sub').textContent=b}
 function tick(){
-  const now=Date.now();analyser.getByteTimeDomainData(buf);let s=0;for(const v of buf){const x=(v-128)/128;s+=x*x}
-  const level=Math.min(100,Math.sqrt(s/buf.length)*300);
-  const isLoud=level>=Math.max(35,amb*2.5);
-  if(!isLoud)amb=amb*0.995+level*0.005;
-  $('lvl').style.width=level+'%';$('lvl').classList.toggle('over',isLoud);
-  if(isLoud){loudMs+=50;if(loudMs>=300)lastLoud=now}else loudMs=0;
+  const now=Date.now();let level=0;
+  if(analyser){
+    analyser.getByteTimeDomainData(buf);let s=0;for(const v of buf){const x=(v-128)/128;s+=x*x}
+    level=Math.min(100,Math.sqrt(s/buf.length)*300);
+    const isLoud=level>=Math.max(35,amb*2.5);
+    if(!isLoud)amb=amb*0.995+level*0.005;
+    $('lvl').style.width=level+'%';$('lvl').classList.toggle('over',isLoud);
+    if(isLoud){loudMs+=50;if(loudMs>=300)lastLoud=now}else loudMs=0;
+  }
   const kwR=kw1&&now-kw1<=3000,loudR=lastLoud&&now-lastLoud<=3000,twice=kwR&&kw2&&kw1-kw2<=6000;
   const score=(kwR?40:0)+(loudR?30:0)+(twice?30:0);
   $('c1').classList.toggle('on',!!kwR);$('c2').classList.toggle('on',!!loudR);$('c3').classList.toggle('on',!!twice);
@@ -260,23 +292,36 @@ function tick(){
     led.classList.remove('on');
     if(kwR&&score>=need&&now>=cooldown){state='pre';preStart=now;kw1=kw2=0;
       log('\nPossible emergency (score '+score+'/100). Say "cancel" within 5 s to stop it.');buzz([200,100,200,100,200]);}
-    else if(kwR&&score<need&&warned!==kw1){warned=kw1;log('Keyword only (score '+score+'/100) - ignored. Needs a loud voice or a second keyword.')}
+    else if(kwR&&score<need&&warned!==kw1){warned=kw1;log('Trigger word only (score '+score+'/100) - ignored. Needs a loud voice or a second trigger word.')}
   }else if(state==='pre'){
     led.classList.toggle('on',Math.floor(now/150)%2===0);
     if(Math.floor(now/500)!==lastBeep){lastBeep=Math.floor(now/500);beep(660,120)}
     ui('Possible emergency','Say "cancel" to stop. SOS in '+Math.max(0,Math.ceil((5000-(now-preStart))/1000))+' s.');
     if(now-preStart>=5000){state='alarm';alarmStart=now;
       buzz([800,200,800,200,800]);beep(880,900);
-      log('\n================================\nSOS SENT - keyword + evidence, not cancelled\nROOM: 108\n(skipped: no server in this test)\n================================');}
+      log('\n================================\nSOS SENT - trigger word + evidence, not cancelled\nROOM: 108\n(skipped: no server in this test)\n================================');}
   }else if(state==='alarm'){
     led.classList.add('on');ui('SOS sent to the hotel manager','Room 108 (demo: clears after 10 s).');
     if(now-alarmStart>=10000){state='idle';cooldown=now+30000;log('SOS reset (demo auto-clear).')}
   }
-  if(state==='idle')ui('Listening','Say the keyword out loud.');
+  if(state==='idle')ui('Listening','Say a trigger word out loud.');
 }
-$('mode').onchange=()=>{need=+$('mode').value;log('Sensitivity: '+(need===40?'any "help" triggers':'balanced'))};
+
+/* ---------- controls ---------- */
 $('start').onclick=start;
-$('lang').onchange=()=>{if(listening&&rec){rec.onend=null;rec.abort();startRec();rec.onend=()=>{if(listening)setTimeout(startRec,200)}}};
+$('sim').onclick=()=>{if(!listening){log('Press Start listening first.');return}keyword('(simulated)')};
+$('clear').onclick=()=>{$('term').textContent=''};
+$('mode').onchange=()=>{need=+$('mode').value;LS.setItem('r108.mode',$('mode').value);log('Sensitivity: '+(need===40?'any trigger word':'balanced'))};
+$('lang').onchange=()=>{LS.setItem('r108.lang',lang());renderWords();log('Language: '+LANGS[lang()]);restartRec()};
+$('meter').onchange=()=>{LS.setItem('r108.meter',$('meter').checked?'1':'0');if(listening){stopAll();log('Volume meter changed - press Start listening again.')}};
+
+/* ---------- init ---------- */
+$('lang').value=LS.getItem('r108.lang')||'en-US';
+$('mode').value=LS.getItem('r108.mode')||'70';need=+$('mode').value;
+const mp=LS.getItem('r108.meter');
+$('meter').checked=mp!==null?mp==='1':!/Android/i.test(navigator.userAgent);
+renderWords();
+if(location.protocol==='file:')showWarn('This page is opened as a local file. Chrome may block or keep asking for the microphone. For reliable recognition, serve it over http://localhost or https:// (for example: "npx serve" or "python -m http.server" in this folder).');
 </script>
 </body>
 </html>
